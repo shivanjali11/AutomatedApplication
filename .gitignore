@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Personal data — lives in MongoDB / your Google Sheet, never in git
+data/*.csv
+resume/
+
+logs/
+*.log
+.DS_Store

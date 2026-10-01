@@ -3,8 +3,10 @@
 Sends job application emails (with resume attached) to HR contacts from a CSV, on a cron schedule.
 
 ## Setup
-1. `npm install`
-2. Edit `.env`: set `MONGO_URI` and `SMTP_PASS` (a Gmail **App Password**).
+Requires Node.js 20.19+.
+
+1. `npm ci --omit=dev`
+2. `cp .env.example .env`, then set `MONGO_URI`, `SMTP_USER` and `SMTP_PASS` (a Gmail **App Password**). All options are documented in `.env.example`.
 3. Upload your resume to MongoDB: `npm run resume:upload -- path/to/Resume.pdf`.
    To change it later, run the same command with the new PDF — the next email uses it, no restart needed.
 4. Contacts source — either:
@@ -26,4 +28,14 @@ Send an HR email from your phone and it goes out immediately — useful when you
 3. Put that id into `ALLOWED_TELEGRAM_CHAT_ID` in `.env`, restart `npm run bot:telegram`. It now only responds to you.
 4. Message it one or more HR emails (one per line, or comma-separated) — it sends your application email with resume to each and confirms.
 
-Keep `npm run bot:telegram` running in a terminal (or `pm2`) for it to respond while you're at work.
+Keep `npm run bot:telegram` running for it to respond while you're at work (see Production below).
+
+## Production
+Run the scheduler and the bot under [pm2](https://pm2.keymetrics.io/) so they restart on crash and on reboot:
+```
+npm install -g pm2
+pm2 start ecosystem.config.js
+pm2 save && pm2 startup   # survive reboots
+pm2 logs                  # tail both processes
+```
+Both processes shut down cleanly on SIGINT/SIGTERM. `.env`, `data/*.csv` and `resume/` are git-ignored, so contacts, credentials and your resume never get committed.

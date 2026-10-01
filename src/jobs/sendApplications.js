@@ -44,7 +44,7 @@ async function runSendJob({ dryRun = false } = {}) {
 
   try {
     const added = await syncContacts();
-    console.log(`[job] ${added} new contact(s) added from CSV`);
+    console.log(`[job] ${added} new contact(s) added`);
 
     const template = await getTemplate(config.templateName);
     const resume = await getResumeAttachment(); // loaded once per run; fails fast if none uploaded
@@ -69,7 +69,7 @@ async function runSendJob({ dryRun = false } = {}) {
       const mail = {
         to: contact.email,
         subject: render(template.subject, data),
-        html: render(template.html, data),
+        html: render(template.html, data, { html: true }),
         text: render(template.text, data),
       };
 

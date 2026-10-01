@@ -8,6 +8,8 @@ const once = args.includes('--once');
 const dryRun = args.includes('--dry-run');
 
 async function main() {
+  if (!once && !cron.validate(config.cronSchedule)) throw new Error(`Invalid CRON_SCHEDULE: ${config.cronSchedule}`);
+
   await connectDB();
 
   if (once) {
@@ -16,11 +18,20 @@ async function main() {
     return;
   }
 
-  if (!cron.validate(config.cronSchedule)) throw new Error(`Invalid CRON_SCHEDULE: ${config.cronSchedule}`);
-
-  cron.schedule(config.cronSchedule, () => runSendJob(), { timezone: config.timezone });
+  const task = cron.schedule(config.cronSchedule, () => runSendJob(), { timezone: config.timezone });
   console.log(`[cron] scheduled "${config.cronSchedule}" (${config.timezone}), batch size ${config.batchSize}`);
+
+  const shutdown = async (signal) => {
+    console.log(`[cron] ${signal} received, shutting down`);
+    task.stop();
+    await disconnectDB().catch(() => {});
+    process.exit(0);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
+
+process.on('unhandledRejection', (err) => console.error('[process] unhandled rejection:', err));
 
 main().catch((err) => {
   console.error(err);

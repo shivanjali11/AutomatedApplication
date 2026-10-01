@@ -9,10 +9,9 @@
 //      message it. Put that id into ALLOWED_TELEGRAM_CHAT_ID in .env.
 //   3. Restart `npm run bot:telegram` — it now only responds to you, and can send.
 
-require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const config = require('../config');
-const { connectDB } = require('../db');
+const { connectDB, disconnectDB } = require('../db');
 const EmailLog = require('../models/EmailLog');
 const { getTemplate, render } = require('../services/templateService');
 const { sendMail, getResumeAttachment, transporter } = require('../services/mailer');
@@ -23,10 +22,14 @@ const allowedChatId = process.env.ALLOWED_TELEGRAM_CHAT_ID;
 if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN in .env — get one from @BotFather on Telegram');
 
 // Telegraf kills any handler that runs past 90s by default — far too short
-// when sending several emails with a multi-minute anti-spam delay between
-// each. Raised to 1 hour, which is what actually crashed the earlier test run.
+// when sending several emails with a multi-minute anti-spam delay between each.
 const bot = new Telegraf(token, { handlerTimeout: 60 * 60 * 1000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Any handler error not caught locally lands here instead of crashing the bot.
+bot.catch((err, ctx) => {
+  console.error(`[bot] unhandled error for update ${ctx.update?.update_id}:`, err);
+});
 
 // A reply failing (e.g. a network blip during a multi-minute send loop) must
 // never crash the whole bot — log it and keep going instead.
@@ -46,7 +49,7 @@ async function sendToEmail(email) {
   const mail = {
     to: email,
     subject: render(template.subject, data),
-    html: render(template.html, data),
+    html: render(template.html, data, { html: true }),
     text: render(template.text, data),
   };
   const info = await sendMail(mail, resume);
@@ -91,7 +94,7 @@ if (!allowedChatId) {
   bot.command('stats', async (ctx) => {
     const counts = await EmailLog.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]);
     const text = counts.map((c) => `${c._id}: ${c.n}`).join('\n') || 'No contacts tracked yet.';
-    ctx.reply(text);
+    await safeReply(ctx, text);
   });
 
   bot.on('text', async (ctx) => {
@@ -138,5 +141,16 @@ if (!allowedChatId) {
   process.exit(1);
 });
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+async function shutdown(signal) {
+  console.log(`[bot] ${signal} received, shutting down`);
+  try {
+    bot.stop(signal);
+  } catch {
+    // not launched yet
+  }
+  await disconnectDB().catch(() => {});
+  process.exit(0);
+}
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
+process.on('unhandledRejection', (err) => console.error('[bot] unhandled rejection:', err));

@@ -17,7 +17,8 @@ function toExportUrl(sheetUrl) {
 // which is detected and reported clearly rather than silently parsed as junk.
 async function readContactsFromSheet(sheetUrl) {
   const exportUrl = toExportUrl(sheetUrl);
-  const res = await fetch(exportUrl, { redirect: 'follow' });
+  // Without a timeout a stalled request would hang the job (and block every later run via isRunning).
+  const res = await fetch(exportUrl, { redirect: 'follow', signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`Failed to fetch sheet (HTTP ${res.status}). Is it shared as "Anyone with the link"?`);
 
   const text = await res.text();
