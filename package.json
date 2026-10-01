@@ -1,0 +1,25 @@
+{
+  "name": "automailer",
+  "version": "1.0.0",
+  "description": "Automated job application mailer",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "send:now": "node src/index.js --once",
+    "send:dry": "node src/index.js --once --dry-run",
+    "seed": "node scripts/seedTemplate.js",
+    "bot:telegram": "node src/bot/telegramBot.js",
+    "resume:upload": "node scripts/uploadResume.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "csv-parse": "^7.0.3",
+    "dotenv": "^18.0.4",
+    "mongoose": "^9.10.2",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^10.0.11",
+    "telegraf": "^4.16.3"
+  }
+}
