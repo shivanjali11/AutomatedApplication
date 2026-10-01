@@ -14,7 +14,7 @@ const config = require('../config');
 const { connectDB, disconnectDB } = require('../db');
 const EmailLog = require('../models/EmailLog');
 const { getTemplate, render } = require('../services/templateService');
-const { sendMail, getResumeAttachment, transporter } = require('../services/mailer');
+const { sendMail, getResumeAttachment, verifyMailer } = require('../services/mailer');
 const { EMAIL_RE } = require('../services/csvReader');
 const { startHealthServer } = require('../health');
 
@@ -135,7 +135,7 @@ if (!allowedChatId) {
 
 (async () => {
   await connectDB();
-  if (allowedChatId) await transporter.verify();
+  if (allowedChatId) await verifyMailer();
   // launch() only resolves once polling stops, so startup work goes in its onLaunch callback.
   await bot.launch(() => {
     console.log('[bot] Telegram bot online (long-polling) — press Ctrl+C to stop');

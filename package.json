@@ -8,12 +8,14 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node src/start.js",
     "send:now": "node src/index.js --once",
     "send:dry": "node src/index.js --once --dry-run",
     "seed": "node scripts/seedTemplate.js",
     "bot:telegram": "node src/bot/telegramBot.js",
-    "resume:upload": "node scripts/uploadResume.js"
+    "resume:upload": "node scripts/uploadResume.js",
+    "start:scheduler": "node src/index.js",
+    "gmail:auth": "node scripts/gmailAuth.js"
   },
   "author": "",
   "license": "ISC",

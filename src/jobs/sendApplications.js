@@ -3,7 +3,7 @@ const EmailLog = require('../models/EmailLog');
 const { readContacts } = require('../services/csvReader');
 const { readContactsFromSheet } = require('../services/sheetReader');
 const { getTemplate, render } = require('../services/templateService');
-const { sendMail, getResumeAttachment, transporter } = require('../services/mailer');
+const { sendMail, getResumeAttachment, verifyMailer } = require('../services/mailer');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let isRunning = false;
@@ -52,7 +52,7 @@ async function runSendJob({ dryRun = false } = {}) {
 
     const template = await getTemplate(config.templateName);
     const resume = await getResumeAttachment(); // loaded once per run; fails fast if none uploaded
-    if (!dryRun) await transporter.verify();
+    if (!dryRun) await verifyMailer();
 
     const batch = await EmailLog.find({
       $or: [{ status: 'pending' }, { status: 'failed', attempts: { $lt: config.maxAttempts } }],

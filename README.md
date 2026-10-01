@@ -17,7 +17,8 @@ Requires Node.js 20.19+.
 ## Run
 - `npm run send:dry` shows what would be sent without sending anything
 - `npm run send:now` sends one batch right now
-- `npm start` starts the scheduler (checks the sheet every 5 minutes, per `CRON_SCHEDULE`)
+- `npm start` starts **both** the scheduler (per `CRON_SCHEDULE`) and the Telegram bot in one command, restarting either if it crashes
+- `npm run start:scheduler` / `npm run bot:telegram` start just one of them
 
 Each contact is emailed only once (tracked in the `emaillogs` collection). Failed sends are retried up to `MAX_ATTEMPTS`.
 
@@ -30,7 +31,28 @@ Send an HR email from your phone and it goes out immediately — useful when you
 
 Keep `npm run bot:telegram` running for it to respond while you're at work (see Production below).
 
+## Gmail API (for hosts that block SMTP)
+Render's free tier (and many others) blocks outbound SMTP, so every send fails with `MAIL_PROVIDER=smtp`. With `MAIL_PROVIDER=gmail-api`, mail goes out from the same Gmail account over HTTPS. You get the same sender and the same daily limit. One-time setup:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and **enable the Gmail API** (APIs & Services → Library).
+2. Configure the **OAuth consent screen**: user type *External*, fill in the app name and your email, and add your Gmail as a test user.
+3. **Publish the app** (consent screen → Audience/Publishing status → *In production*). You don't need Google verification for personal use. If you skip this step, Google expires the refresh token after **7 days** and sending stops.
+4. Create credentials → **OAuth client ID** → type **Desktop app**. Put its ID and secret in `.env` as `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET`.
+5. On your own computer, run `npm run gmail:auth`, open the printed link, and sign in with your Gmail. Google shows "Google hasn't verified this app": click *Advanced → Go to …* (it's your own app). Copy the printed `GMAIL_REFRESH_TOKEN` into `.env`.
+6. Set `MAIL_PROVIDER=gmail-api`. `SMTP_PASS` is no longer needed. Test locally with `npm run send:dry`, then `npm run send:now`.
+
+The app only gets the `gmail.send` permission, so it can send mail but cannot read your inbox. To revoke it, go to https://myaccount.google.com/permissions.
+
 ## Production
+### Render (or any single-command host)
+Build command `npm ci --omit=dev`, start command `npm start`. This runs the scheduler and the bot together in one service, and the health check listens on Render's `PORT`.
+
+On the **free** plan:
+- use `MAIL_PROVIDER=gmail-api` (SMTP is blocked; see above)
+- point a free uptime monitor (e.g. UptimeRobot) at `https://<your-app>.onrender.com/health` every 10 minutes. Otherwise Render puts the service to sleep after 15 idle minutes, and the scheduler and bot stop.
+- allow `0.0.0.0/0` in MongoDB Atlas → Network Access, because Render's outbound IPs aren't fixed
+
+### VPS with pm2
 Run the scheduler and the bot under [pm2](https://pm2.keymetrics.io/) so they restart on crash and on reboot:
 ```
 npm install -g pm2
