@@ -7,6 +7,7 @@ const { sendMail, getResumeAttachment, transporter } = require('../services/mail
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let isRunning = false;
+let lastRun = null; // summary of the most recent scheduled run, reported by the health check
 
 // Adds new contacts to EmailLog as "pending"; existing ones are left untouched.
 // Prefers the live Google Sheet (if configured) so new rows are picked up
@@ -41,6 +42,9 @@ async function runSendJob({ dryRun = false } = {}) {
     return;
   }
   isRunning = true;
+  const run = { startedAt: new Date(), error: null };
+  let sent = 0;
+  let failed = 0;
 
   try {
     const added = await syncContacts();
@@ -62,8 +66,6 @@ async function runSendJob({ dryRun = false } = {}) {
     }
     console.log(`[job] sending ${batch.length} email(s)${dryRun ? ' (DRY RUN)' : ''}`);
 
-    let sent = 0;
-    let failed = 0;
     for (const [i, contact] of batch.entries()) {
       const data = { name: contact.name, company: contact.company, email: contact.email };
       const mail = {
@@ -96,10 +98,17 @@ async function runSendJob({ dryRun = false } = {}) {
 
     if (!dryRun) console.log(`[job] done — sent: ${sent}, failed: ${failed}`);
   } catch (err) {
+    run.error = err.message;
     console.error('[job] run aborted:', err.message);
   } finally {
+    Object.assign(run, { finishedAt: new Date(), sent, failed });
+    if (!dryRun) lastRun = run;
     isRunning = false;
   }
 }
 
-module.exports = { runSendJob };
+function getJobStatus() {
+  return { running: isRunning, lastRun };
+}
+
+module.exports = { runSendJob, getJobStatus };

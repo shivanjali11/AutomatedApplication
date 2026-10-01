@@ -38,4 +38,14 @@ pm2 start ecosystem.config.js
 pm2 save && pm2 startup   # survive reboots
 pm2 logs                  # tail both processes
 ```
+### Health check
+Both long-running processes expose `GET /health` (plain JSON, no auth). Point an uptime monitor or load balancer at it.
+
+| Process | Default URL | Port setting |
+|---|---|---|
+| Scheduler (`npm start`) | `http://localhost:3000/health` | `HEALTH_PORT` |
+| Telegram bot | `http://localhost:3001/health` | `BOT_HEALTH_PORT` |
+
+It returns **200** when MongoDB is connected and **503** otherwise. The scheduler also reports its schedule, whether a job is running, and the last run's `sent`/`failed` counts and error. Set a port to `0` to disable it. `--once` runs don't start it.
+
 Both processes shut down cleanly on SIGINT/SIGTERM. `.env`, `data/*.csv` and `resume/` are git-ignored, so contacts, credentials and your resume never get committed.

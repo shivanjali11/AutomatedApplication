@@ -16,6 +16,7 @@ const EmailLog = require('../models/EmailLog');
 const { getTemplate, render } = require('../services/templateService');
 const { sendMail, getResumeAttachment, transporter } = require('../services/mailer');
 const { EMAIL_RE } = require('../services/csvReader');
+const { startHealthServer } = require('../health');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const allowedChatId = process.env.ALLOWED_TELEGRAM_CHAT_ID;
@@ -25,6 +26,7 @@ if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN in .env — get one from
 // when sending several emails with a multi-minute anti-spam delay between each.
 const bot = new Telegraf(token, { handlerTimeout: 60 * 60 * 1000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let health = null;
 
 // Any handler error not caught locally lands here instead of crashing the bot.
 bot.catch((err, ctx) => {
@@ -134,8 +136,17 @@ if (!allowedChatId) {
 (async () => {
   await connectDB();
   if (allowedChatId) await transporter.verify();
-  await bot.launch();
-  console.log('[bot] Telegram bot online (long-polling) — press Ctrl+C to stop');
+  // launch() only resolves once polling stops, so startup work goes in its onLaunch callback.
+  await bot.launch(() => {
+    console.log('[bot] Telegram bot online (long-polling) — press Ctrl+C to stop');
+    if (config.botHealthPort) {
+      health = startHealthServer({
+        name: 'telegram-bot',
+        port: config.botHealthPort,
+        getDetails: () => ({ mode: allowedChatId ? 'locked' : 'setup' }),
+      });
+    }
+  });
 })().catch((err) => {
   console.error('[bot] failed to start:', err.message);
   process.exit(1);
@@ -148,6 +159,7 @@ async function shutdown(signal) {
   } catch {
     // not launched yet
   }
+  health?.close();
   await disconnectDB().catch(() => {});
   process.exit(0);
 }

@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const config = require('./config');
 const { connectDB, disconnectDB } = require('./db');
-const { runSendJob } = require('./jobs/sendApplications');
+const { runSendJob, getJobStatus } = require('./jobs/sendApplications');
+const { startHealthServer } = require('./health');
 
 const args = process.argv.slice(2);
 const once = args.includes('--once');
@@ -21,9 +22,18 @@ async function main() {
   const task = cron.schedule(config.cronSchedule, () => runSendJob(), { timezone: config.timezone });
   console.log(`[cron] scheduled "${config.cronSchedule}" (${config.timezone}), batch size ${config.batchSize}`);
 
+  const health = config.healthPort
+    ? startHealthServer({
+        name: 'scheduler',
+        port: config.healthPort,
+        getDetails: () => ({ schedule: config.cronSchedule, timezone: config.timezone, job: getJobStatus() }),
+      })
+    : null;
+
   const shutdown = async (signal) => {
     console.log(`[cron] ${signal} received, shutting down`);
     task.stop();
+    health?.close();
     await disconnectDB().catch(() => {});
     process.exit(0);
   };

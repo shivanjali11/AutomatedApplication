@@ -32,4 +32,7 @@ module.exports = {
   batchSize: positiveInt('BATCH_SIZE', 20),
   delayMs: positiveInt('DELAY_MS', 60000),
   maxAttempts: positiveInt('MAX_ATTEMPTS', 3),
+  // Separate ports because the scheduler and the bot run as separate processes. 0 disables.
+  healthPort: positiveInt('HEALTH_PORT', 3000),
+  botHealthPort: positiveInt('BOT_HEALTH_PORT', 3001),
 };
